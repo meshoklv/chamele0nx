@@ -89,10 +89,11 @@ That seam is the entire mechanism: `ShapedConn` has to sit between the
 TLS layer and the HTTP/2 framer, and a library that owns both ends of
 that boundary is unusable no matter how good it is. The honest cost is
 visible in `go.mod`: the client pulls `refraction-networking/utls` for
-the handshake and `bogdanfinn/fhttp` for HTTP/2 framing, and the latter
-carries its own uTLS fork. Only the first performs a handshake; the
-second never sees a `Config`. That is two forks in the module graph to
-keep one seam under our control, and it was judged the cheaper trade.
+the handshake and `imroc/req` for HTTP/2 framing. Only the first performs
+a handshake; the second is handed an already-handshaked connection through
+its dial hook and never sees a TLS `Config`. That is a heavier module graph
+than the standard library would need, in exchange for keeping one seam under
+our control, and it was judged the cheaper trade.
 
 ---
 
@@ -175,7 +176,7 @@ Chrome's order, an initial `WINDOW_UPDATE` of 15663105, and the
 pseudo-header order `:method :authority :scheme :path`. Standard library
 HTTP/2 sends `:method :scheme :authority :path`, and detectors of the
 Akamai family fingerprint on that single difference. Getting at those
-knobs is why the client uses `bogdanfinn/fhttp` rather than
+knobs is why the client uses `imroc/req` (MIT) rather than
 `golang.org/x/net/http2`.
 
 **Trade-offs.** One POST for the whole tunnel means one HTTP/2 stream,
@@ -378,7 +379,7 @@ Per client tunnel, once established:
 | `PersistentClient.acceptLoop` | `Start` | The SOCKS5 listener | Listener closed |
 | `handleSOCKS5` | `acceptLoop`, one per client connection | One client socket and one stream | Either relay direction ends |
 | two relay goroutines | `handleSOCKS5` | One direction each | Read or write error |
-| HTTP/2 internals | `fhttp/http2` | Framing and flow control | Connection teardown |
+| HTTP/2 internals | `imroc/req` HTTP/2 | Framing and flow control | Connection teardown |
 
 Per server tunnel:
 

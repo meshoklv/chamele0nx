@@ -208,9 +208,9 @@ make the client trivially interceptable.
 
 ### 3.5 HTTP/2
 
-The client uses `github.com/bogdanfinn/fhttp/http2`, not the standard library,
+The client uses `github.com/imroc/req/v3` (MIT), not the standard library,
 in order to emit Chrome's HTTP/2 fingerprint. The settings below are exact
-values from `Transport.connect`:
+values from `newChromeH2Transport`:
 
 | Setting | Value |
 |---|---|
@@ -219,7 +219,7 @@ values from `Transport.connect`:
 | `SETTINGS_INITIAL_WINDOW_SIZE` | 6291456 |
 | `SETTINGS_MAX_HEADER_LIST_SIZE` | 262144 |
 
-Four settings, in exactly that order (`SettingsOrder`).
+Four settings, in exactly that order (`SetHTTP2SettingsFrame` takes an ordered list).
 `SETTINGS_MAX_CONCURRENT_STREAMS` and `SETTINGS_MAX_FRAME_SIZE` are deliberately
 **absent** — Chrome does not advertise them.
 
@@ -1033,7 +1033,7 @@ registered at `init()` into a process-global registry;
 listing what the build does have.
 
 **Honest status.** `saasHTTP2Cover.Open` is a stub that returns an error. The
-real path — uTLS dial, `ShapedConn`, `fhttp/http2`, POST pipe, key exchange —
+real path — uTLS dial, `ShapedConn`, `imroc/req` HTTP/2, POST pipe, key exchange —
 is still inline in `Transport.connect`. The registry today therefore does two
 things and only two: it reserves the name so a client can be told whether this
 build supports the mask it asked for, and it pins the log description. Selecting

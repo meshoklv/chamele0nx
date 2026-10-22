@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -22,28 +23,7 @@ import (
 	"github.com/meshoklv/chamele0nx/internal/chcrypto"
 	"github.com/meshoklv/chamele0nx/transport"
 
-	// v2.1: switched HTTP/2 client from golang.org/x/net/http2 to
-	// github.com/bogdanfinn/fhttp/http2 to fix the H2 fingerprint
-	// mismatch with Chrome (4 SETTINGS not 6, INITIAL_WINDOW_SIZE
-	// 6291456, pseudo-header order m,a,s,p, ConnectionFlow 15663105).
-	// Goes hand-in-hand with importing fhttp instead of net/http for
-	// the Request type — fhttp/http2.Transport accepts *fhttp.Request,
-	// not *net/http.Request. The two are field-compatible (fhttp is a
-	// fork of net/http with extra HeaderOrderKey / PHeaderOrderKey).
-	//
-	// Note: fhttp/http2 internally aliases its TLS layer to
-	// github.com/bogdanfinn/utls (NOT refraction-networking/utls). Our
-	// dialChamele0nXUTLS still uses refraction-networking/utls for the
-	// actual TLS handshake — that's intentional, the two utls forks
-	// don't need to interop here because we hand fhttp/http2 a generic
-	// net.Conn and let it run framing on top of our pre-handshaked TLS.
-	// fhttp/http2's connectionStater type-assertion will fail (returns
-	// our chamele0nxConnAdapter which has no ConnectionState method on
-	// the bgnutls type), and that's fine — fhttp/http2 just leaves the
-	// peer cert state nil, which the framer doesn't care about.
-	http "github.com/bogdanfinn/fhttp"
-	"github.com/bogdanfinn/fhttp/http2"
-	bgnutls "github.com/bogdanfinn/utls"
+	reqlib "github.com/imroc/req/v3"
 
 	utls "github.com/refraction-networking/utls"
 	"golang.org/x/crypto/hkdf"
@@ -369,66 +349,29 @@ func (t *Transport) connect(ctx context.Context, endpoint transport.Endpoint) (*
 		dialFn = t.dialChamele0nXUTLS
 	}
 
-	// fhttp/http2.Transport with an explicit Chrome 146 H2
-	// fingerprint. Settings are 4-entry exactly matching what real
-	// Chrome 120-146 sends (per scrapfly.io HTTP/2 fingerprint guide
-	// + Akamai whitepaper). MaxConcurrentStreams and MaxFrameSize are
-	// NOT in the set — Chrome doesn't advertise them.
-	//
-	// ConnectionFlow=15663105 is the magic initial WINDOW_UPDATE Chrome
-	// emits right after SETTINGS, observed in every modern Chrome capture.
-	//
-	// PseudoHeaderOrder is the load-bearing one: stdlib http2 sends
-	// :method :scheme :authority :path; Chrome sends m,a,s,p. Akamai-class
-	// detectors fingerprint on this single difference.
-	//
-	// DialTLS in fhttp/http2 has a different signature than stdlib's
-	// DialTLSContext — no context, and the cfg is *bgnutls.Config not
-	// *stdtls.Config. We ignore the cfg (dialChamele0nXUTLS runs its own
-	// handshake with refraction-networking/utls) but we do close over the
-	// ctx handed to connect, so cancelling that context aborts the TLS
-	// handshake instead of waiting out the 15s net.Dialer timeout. The
-	// dial happens once, inside this call to connect, so a ctx cancelled
-	// after the tunnel is up cannot disturb the established tunnel.
-	h2t := &http2.Transport{
-		DialTLS: func(network, _ string, _ *bgnutls.Config) (net.Conn, error) {
-			conn, err := dialFn(ctx, addr, sni)
-			if err != nil {
-				return nil, err
-			}
-			// Shape TLS records to match the cover site profile.
-			// MUST sit between TLS and the H2 framer — that's why we
-			// can't use bogdanfinn/tls-client (it owns the TLS layer
-			// internally and doesn't expose this seam).
-			return NewShapedConn(conn, profile, clientSeed), nil
-		},
-		Settings: map[http2.SettingID]uint32{
-			http2.SettingHeaderTableSize:   65536,
-			http2.SettingEnablePush:        0,
-			http2.SettingInitialWindowSize: 6291456,
-			http2.SettingMaxHeaderListSize: 262144,
-		},
-		SettingsOrder: []http2.SettingID{
-			http2.SettingHeaderTableSize,
-			http2.SettingEnablePush,
-			http2.SettingInitialWindowSize,
-			http2.SettingMaxHeaderListSize,
-		},
-		ConnectionFlow:    15663105, // Chrome's initial WINDOW_UPDATE delta
-		InitialWindowSize: 6291456,  // mirror SettingInitialWindowSize, fhttp uses both fields
-		HeaderTableSize:   65536,    // mirror SettingHeaderTableSize
-		PseudoHeaderOrder: []string{":method", ":authority", ":scheme", ":path"},
-
-		AllowHTTP:          false,
-		DisableCompression: true,
-		// ReadIdleTimeout is deliberately left zero. A non-zero value
-		// makes the HTTP/2 transport emit an automatic PING on every
-		// idle interval, which puts a fixed-size record on the wire at a
-		// fixed period in both directions — a clean periodic signal no
-		// ordinary browser produces on an idle connection. Dead-tunnel
-		// detection instead falls back to the per-stream idle deadlines
-		// on the relay, which is slower but carries no timing signature.
-	}
+	// HTTP/2 client with an explicit Chrome 146 H2 fingerprint (see
+	// newChromeH2Transport in h2client.go). The dial happens once, inside
+	// connect, and closes over ctx so cancelling it aborts the TLS
+	// handshake instead of waiting out the 15s net.Dialer timeout; a ctx
+	// cancelled after the tunnel is up cannot disturb the established
+	// tunnel.
+	h2t := newChromeH2Transport(func(_ context.Context, _, _ string) (net.Conn, error) {
+		conn, err := dialFn(ctx, addr, sni)
+		if err != nil {
+			return nil, err
+		}
+		// Shape TLS records to match the cover site profile. MUST sit
+		// between TLS and the H2 framer, which is why the TLS layer is
+		// dialled by us and handed to the HTTP/2 client pre-handshaked.
+		return NewShapedConn(conn, profile, clientSeed), nil
+	})
+	// ReadIdleTimeout is deliberately left zero. A non-zero value
+	// makes the HTTP/2 transport emit an automatic PING on every
+	// idle interval, which puts a fixed-size record on the wire at a
+	// fixed period in both directions — a clean periodic signal no
+	// ordinary browser produces on an idle connection. Dead-tunnel
+	// detection instead falls back to the per-stream idle deadlines
+	// on the relay, which is slower but carries no timing signature.
 
 	// Create bidirectional tunnel via HTTP/2 POST.
 	// Request body = client → server (encrypted VPN data).
@@ -470,8 +413,8 @@ func (t *Transport) connect(ctx context.Context, endpoint transport.Endpoint) (*
 	// controls regular headers — Chrome typically sends Cookie first,
 	// then Content-Type, then Accept, then User-Agent on POST requests
 	// to JSON APIs (observed in Chrome devtools network tab).
-	req.Header[http.HeaderOrderKey] = []string{"cookie", "content-type", "accept", "user-agent"}
-	req.Header[http.PHeaderOrderKey] = []string{":method", ":authority", ":scheme", ":path"}
+	req.Header[reqlib.HeaderOderKey] = []string{"cookie", "content-type", "accept", "user-agent"}
+	req.Header[reqlib.PseudoHeaderOderKey] = chromePseudoHeaderOrder
 
 	resp, err := h2t.RoundTrip(req)
 	if err != nil {
@@ -603,7 +546,7 @@ func (t *Transport) Close() error {
 type Tunnel struct {
 	writer     *io.PipeWriter // client → server (request body)
 	reader     io.ReadCloser  // server → client (response body)
-	h2t        *http2.Transport
+	h2t        *reqlib.Transport
 	sessionKey *sessionKeyGuard
 	mux        *Mux
 	endpoint   transport.Endpoint
@@ -1047,7 +990,8 @@ func (t *Transport) dialUTLSWith(ctx context.Context, addr, sni string, pubkeyPi
 	return &chamele0nxConnAdapter{uconn: uconn, tcp: tcpConn}, nil
 }
 
-// chamele0nxConnAdapter wraps utls.UConn for http2.Transport compatibility.
+// chamele0nxConnAdapter wraps utls.UConn as a plain net.Conn. The H2 client
+// never sees it directly: h2Conn (h2client.go) adds the TLS-state methods.
 type chamele0nxConnAdapter struct {
 	uconn *utls.UConn
 	tcp   net.Conn
@@ -1063,14 +1007,6 @@ func (a *chamele0nxConnAdapter) SetReadDeadline(t time.Time) error { return a.uc
 func (a *chamele0nxConnAdapter) SetWriteDeadline(t time.Time) error {
 	return a.uconn.SetWriteDeadline(t)
 }
-
-// v2.1: ConnectionState() removed. It was only needed by stdlib's
-// x/net/http2 connectionStater interface, which returned crypto/tls.
-// ConnectionState. fhttp/http2 expects bgnutls.ConnectionState (a
-// different fork), so even if we kept the method it wouldn't match
-// fhttp's interface. fhttp/http2 just leaves cc.tlsState nil when
-// the conn doesn't implement its connectionStater — that's fine for
-// our use case (we don't read peer cert info from the H2 framer).
 
 // --- helpers ---
 

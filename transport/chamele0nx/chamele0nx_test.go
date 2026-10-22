@@ -20,21 +20,12 @@ import (
 
 	"github.com/meshoklv/chamele0nx/transport"
 
-	// v2.1: this test uses TWO HTTP/2 stacks because the production
-	// split is asymmetric — the server-side runs on stdlib http2.Server
-	// (server fingerprint matters less; the cover-site role is to look
-	// like a SaaS *responding* to clients, not to substitute Chrome itself),
-	// while the client-side runs on fhttp/http2 to substitute Chrome H2 on
-	// outbound. So:
-	//   - "net/http" + "golang.org/x/net/http2" → mock SERVER side
-	//   - fhttp + fhttp/http2 → mock CLIENT side (matches production
-	//     Tunnel.h2t type, otherwise the test can't build the
-	//     same struct as the real code)
+	// The mock server side runs on stdlib http2.Server; the client side
+	// uses the same Chrome-fingerprint HTTP/2 transport as production
+	// (newChromeH2Transport), so Tunnel.h2t has the real type.
 	stdhttp2 "golang.org/x/net/http2"
 
-	fhttp "github.com/bogdanfinn/fhttp"
-	fhttp2 "github.com/bogdanfinn/fhttp/http2"
-	bgnutls "github.com/bogdanfinn/utls"
+	reqlib "github.com/imroc/req/v3"
 )
 
 // TestEndToEndTunnel tests the full Chamele0nX flow:
@@ -806,47 +797,19 @@ func connectChamele0nXTest(ctx context.Context, ct *Transport, endpoint transpor
 	clientSeed := generateClientSeed()
 	clientProfile := DefaultSaaSProfile()
 
-	h2t := &fhttp2.Transport{
-		// v2.1: fhttp/http2 DialTLS has no context and uses bgnutls.Config
-		// instead of stdlib *tls.Config. We ignore both — the test dialer
-		// uses stdlib tls.Dialer with its own config + a 15s deadline.
-		DialTLS: func(network, _ string, _ *bgnutls.Config) (net.Conn, error) {
-			conn, err := tlsDialer.DialContext(ctx, network, addr)
-			if err != nil {
-				return nil, err
-			}
-			return NewShapedConn(conn, clientProfile, clientSeed), nil
-		},
-		// v2.1: must mirror production's H2 settings — without an
-		// explicit Settings/SettingsOrder, fhttp/http2's default HEADERS
-		// framing diverges from what stdlib http2.Server (used here) is
-		// willing to accept, manifesting as PROTOCOL_ERROR on stream 1.
-		Settings: map[fhttp2.SettingID]uint32{
-			fhttp2.SettingHeaderTableSize:   65536,
-			fhttp2.SettingEnablePush:        0,
-			fhttp2.SettingInitialWindowSize: 6291456,
-			fhttp2.SettingMaxHeaderListSize: 262144,
-		},
-		SettingsOrder: []fhttp2.SettingID{
-			fhttp2.SettingHeaderTableSize,
-			fhttp2.SettingEnablePush,
-			fhttp2.SettingInitialWindowSize,
-			fhttp2.SettingMaxHeaderListSize,
-		},
-		ConnectionFlow:    15663105,
-		InitialWindowSize: 6291456,
-		HeaderTableSize:   65536,
-		PseudoHeaderOrder: []string{":method", ":authority", ":scheme", ":path"},
-
-		AllowHTTP:          false,
-		DisableCompression: true,
-		ReadIdleTimeout:    15 * time.Second,
-		PingTimeout:        5 * time.Second,
-	}
+	h2t := newChromeH2Transport(func(ctx context.Context, network, _ string) (net.Conn, error) {
+		conn, err := tlsDialer.DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		return NewShapedConn(conn, clientProfile, clientSeed), nil
+	})
+	h2t.SetHTTP2ReadIdleTimeout(15 * time.Second)
+	h2t.SetHTTP2PingTimeout(5 * time.Second)
 
 	pr, pw := io.Pipe()
 
-	req, err := fhttp.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://%s%s", sni, apiPath), pr)
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://%s%s", sni, apiPath), pr)
 	if err != nil {
 		pw.Close()
 		return nil, err
@@ -854,6 +817,8 @@ func connectChamele0nXTest(ctx context.Context, ct *Transport, endpoint transpor
 	req.Header.Set("Cookie", cookie)
 	req.Header.Set("Content-Type", "application/json")
 	req.Host = sni
+	req.Header[reqlib.HeaderOderKey] = []string{"cookie", "content-type"}
+	req.Header[reqlib.PseudoHeaderOderKey] = chromePseudoHeaderOrder
 
 	resp, err := h2t.RoundTrip(req)
 	if err != nil {
@@ -861,7 +826,7 @@ func connectChamele0nXTest(ctx context.Context, ct *Transport, endpoint transpor
 		return nil, fmt.Errorf("h2 post: %w", err)
 	}
 
-	if resp.StatusCode != fhttp.StatusOK {
+	if resp.StatusCode != http.StatusOK {
 		pw.Close()
 		resp.Body.Close()
 		return nil, fmt.Errorf("server returned %d", resp.StatusCode)

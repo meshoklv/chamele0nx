@@ -35,16 +35,6 @@ REALITY does. That is a different wire protocol. Until then the
 documented mitigation is a real front terminating TLS, at the cost of
 record shaping.
 
-**A dependency ships with no licence.** `github.com/bogdanfinn/fhttp`
-carries no licence file, in the module or in its repository, and neither
-does the fork it came from. It is a fork of Go's `net/http`, so the
-inherited code is BSD, but the fork's own changes grant nothing. It is
-used for one thing: Chrome's HTTP/2 fingerprint, which
-`golang.org/x/net/http2` cannot produce because its settings, connection
-flow and pseudo-header order are not configurable. `imroc/req` is MIT and
-exposes all of them, and is the intended replacement once the duplex
-streaming this transport needs has been proven against it.
-
 **Server discovery.** Clients are configured with an address by hand. If
 a server's address is blocked, every one of its users is stranded until
 someone tells them a new address out of band. This is the single biggest

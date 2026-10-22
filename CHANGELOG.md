@@ -7,6 +7,15 @@ major version change means the wire format changed.
 
 ## Unreleased
 
+### Changed
+- The client's HTTP/2 stack moved from `github.com/bogdanfinn/fhttp` (which
+  carries no licence file) to `github.com/imroc/req/v3` (MIT), and the second
+  uTLS fork (`bogdanfinn/utls`) left the module graph with it. The Chrome
+  HTTP/2 fingerprint is unchanged: the same four SETTINGS in the same order,
+  the same initial WINDOW_UPDATE of 15663105, the same pseudo-header and
+  header order. A new test reads the raw connection preface and checks all of
+  it.
+
 ### Fixed
 - `chamele0nx-validator` can pass its own self-test. It compared the sizes a
   profile emits against the histogram those sizes are drawn from *before* the
@@ -95,9 +104,6 @@ major version change means the wire format changed.
 - The server's own TLS fingerprint is Go's, not the nginx the cover site
   imitates, and Go's ServerHello order cannot be configured to change that.
   Recorded in the threat model with the mitigation and its cost.
-- `github.com/bogdanfinn/fhttp` ships with no licence. It does not affect
-  publishing or reading this source, but it does affect anyone distributing
-  compiled binaries. Recorded in the disclaimer and on the roadmap.
 - The shipped defaults are a fingerprint shared by every deployment that
   leaves them alone: `-api-path`, `-server-id`, `-cookie-format` and the
   sample cover site. Neither README said so, and the install guide listed

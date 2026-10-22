@@ -46,22 +46,9 @@ advice, and nothing in it should be read as encouragement to do anything.
 
 ## Dependency licensing
 
-One dependency, `github.com/bogdanfinn/fhttp`, ships without a licence
-file — not in the published module, not in its repository, and not in the
-fork it was taken from. It is a fork of Go's `net/http`, so the inherited
-code remains under the Go Authors' BSD licence, but the fork's own
-changes carry no grant at all.
-
-What that means in practice: publishing or reading this repository's
-source is unaffected, because the dependency is referenced by module path
-and never copied here. Distributing **compiled binaries** is a different
-matter — a binary contains that code, and the AGPL obliges whoever
-distributes it to supply the corresponding source under the AGPL, which
-cannot be done for code that grants no rights. Anyone building binaries
-for others should resolve that first.
-
-Replacing the dependency is on the roadmap; it exists solely to reproduce
-Chrome's HTTP/2 fingerprint, which the standard library cannot express.
+All dependencies are under permissive licences (MIT, BSD-3-Clause, Apache-2.0)
+compatible with the AGPL; see `THIRD_PARTY_NOTICES.md`. The client's HTTP/2
+stack, `github.com/imroc/req/v3`, is MIT.
 
 ## Cryptography and export
 
