@@ -104,3 +104,4 @@ xboxlive.com
 
 # Named in a source comment that records what a live check found.
 wordpress.org
+gcr.io
