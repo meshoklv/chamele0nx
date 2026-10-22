@@ -1,0 +1,29 @@
+{
+  "_comment": "EXAMPLE ONLY. An illustrative shape authored for this repository, not captured from any site and not measured from real traffic. An operator who runs it unmodified is running the same fingerprint as every other reader of this repository, which is exactly the shape a censor can build one classifier against. Capture your own with chamele0nx-profiler and keep it private.",
+
+  "name": "saas-fast",
+  "version": 1,
+
+  "record_size_distribution": [
+    { "min_size": 128,  "max_size": 1100,  "weight": 0.08 },
+    { "min_size": 1100, "max_size": 3400,  "weight": 0.14 },
+    { "min_size": 3400, "max_size": 9200,  "weight": 0.27 },
+    { "min_size": 9200, "max_size": 15600, "weight": 0.51 }
+  ],
+
+  "burst_pattern": {
+    "records_per_burst":  { "min": 34,     "max": 76 },
+    "burst_duration":     { "min_ms": 120, "max_ms": 900 },
+    "inter_burst_pause":  { "min_ms": 4,   "max_ms": 22 },
+    "inter_record_delay": { "min_ms": 0,   "max_ms": 2 }
+  },
+
+  "session_profile": {
+    "duration":               { "min_ms": 210000,   "max_ms": 1500000 },
+    "bursts_per_session":     { "min": 90,          "max": 460 },
+    "total_bytes_per_session": { "min": 80000000,   "max": 420000000 }
+  },
+
+  "upload_download_ratio": 0.06,
+  "concurrent_streams": { "min": 2, "max": 7 }
+}

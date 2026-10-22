@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/meshoklv/chamele0nx/security/advisories/new
+    about: Never report a security problem in a public issue. Use a private advisory.
+  - name: Question or idea
+    url: https://github.com/meshoklv/chamele0nx/discussions
+    about: Ask a question or float an idea before opening an issue.

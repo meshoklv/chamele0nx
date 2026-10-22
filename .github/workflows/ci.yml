@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -s -l .)
+          if [ -n "$out" ]; then echo "not gofmt-ed:"; echo "$out"; exit 1; fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: build
+        run: make build
+
+      - name: test (race)
+        run: go test -race ./...
+
+  lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: true
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          # Pinned to the major the .golangci.yml schema targets.
+          version: v2.13.2
+
+  crosscompile:
+    # The code ships a mobile binding and cross-compiles to a dozen targets,
+    # but the rest of CI only ever builds linux/amd64. A 32-bit overflow that
+    # silently turned a random pause into a constant reached review that way:
+    # it was invisible on amd64 and wrong on android/arm. Building every
+    # target, and running the tests once as a 32-bit binary, is what catches
+    # that class.
+    name: cross-compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - {goos: linux, goarch: arm}
+          - {goos: linux, goarch: arm64}
+          - {goos: linux, goarch: '386'}
+          - {goos: darwin, goarch: arm64}
+          - {goos: windows, goarch: amd64}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: true
+      - name: build
+        env:
+          GOOS: ${{ matrix.target.goos }}
+          GOARCH: ${{ matrix.target.goarch }}
+        run: go build ./...
+
+  test32:
+    # Runs the suite as a 32-bit binary, where int is half the width it is
+    # everywhere else. GOARCH=386 executes directly on the amd64 runner.
+    name: test (32-bit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: true
+      - run: GOARCH=386 go test ./...
+
+  hygiene:
+    name: no private data
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history: the script also scans past commits for credentials, and
+      # checkout's default fetch-depth of 1 would silently reduce that to the
+      # tip — a green result that proves nothing about the very thing the
+      # history scan exists to catch.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: scripts/check-no-private-data.sh
+
+  govulncheck:
+    name: vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: true
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: govulncheck ./...

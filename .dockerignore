@@ -1,0 +1,12 @@
+.git
+bin
+dist
+*.env
+.env*
+!.env.example
+certs
+secrets
+profiles
+docs
+*.md
+!deploy/cover-site/README.md

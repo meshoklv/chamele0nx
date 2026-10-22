@@ -1,0 +1,106 @@
+# Hostnames that may legitimately appear in this repository.
+# Anything not listed here trips scripts/check-no-private-data.sh.
+# Add a line only after checking that the host is public and generic,
+# never because a check about your own deployment was inconvenient.
+
+# Documentation examples
+example.com
+example.org
+example.net
+vpn.example.com
+
+# Badges and the project's own repository
+img.shields.io
+github.com
+raw.githubusercontent.com
+
+# Public CDNs and services named in the decoy target list and the SNI pool.
+# These are third-party hosts a real browser contacts; none of them is ours.
+fonts.bunny.net
+cdn.jsdelivr.net
+cdn.skypack.dev
+code.cdn.mozilla.net
+sentry.io
+plausible.io
+scrapfly.io
+mail.ru
+speed.cloudflare.com
+ifconfig.me
+
+# Upstream projects and standards bodies cited in the documentation
+golang.org
+go.dev
+pkg.go.dev
+www.gnu.org
+keepachangelog.com
+semver.org
+contributor-covenant.org
+www.contributor-covenant.org
+shadowsocks.org
+v2.hysteria.network
+docs.amnezia.org
+gitlab.torproject.org
+spec.torproject.org
+support.torproject.org
+gfw.report
+censorbib.nymity.ch
+censoredplanet.org
+ooni.org
+petsymposium.org
+www.usenix.org
+www.ndss-symposium.org
+www.ieee-security.org
+dl.acm.org
+doi.org
+cse.hkust.edu.hk
+www.comsys.rwth-aachen.de
+learn.microsoft.com
+app.example.com
+www.w3.org
+cdnjs.cloudflare.com
+www.cloudflare.com
+www.fastly.com
+formulae.brew.sh
+registry.npmjs.org
+hub.docker.com
+api.github.com
+en.wikipedia.org
+developer.mozilla.org
+meta.discourse.org
+jsonplaceholder.typicode.com
+
+# Bare public hostnames from the substitution SNI pool in
+# transport/chamele0nx/sni_pool.go. Each is a well-known third-party service
+# that any browser contacts; none of them belongs to an operator of this
+# project. Adding a line here means "this host is public and generic".
+adobe.com
+adobelogin.com
+apache.org
+apple.com
+asana.com
+askubuntu.com
+atlassian.com
+bing.com
+bitbucket.org
+bootstrapcdn.com
+box.com
+cdnjs.com
+centos.org
+cisco.com
+dropbox.com
+fedoraproject.org
+spotify.com
+stackexchange.com
+stackoverflow.com
+sublimetext.com
+superuser.com
+trello.com
+visualstudio.com
+vmware.com
+webex.com
+windows.com
+xbox.com
+xboxlive.com
+
+# Named in a source comment that records what a live check found.
+wordpress.org

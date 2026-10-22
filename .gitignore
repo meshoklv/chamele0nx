@@ -1,0 +1,42 @@
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+
+# Coverage
+coverage.out
+coverage.html
+
+# Local secrets and operator configuration — never commit these
+*.env
+.env*
+!.env.example
+secrets/
+*.pem
+*.key
+certs/
+!deploy/**/*.example
+*.secret
+
+# Site traffic profiles captured by the operator.
+# Publishing a profile lets a censor build a focused classifier for
+# exactly that cover site. Keep your own profiles out of git.
+/profiles/
+*.profile.json
+!deploy/profiles/*.example.json
+
+# Mobile build artifacts
+*.aar
+*.xcframework/
+*.framework/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Python bytecode from the diagram generator
+__pycache__/
+*.pyc

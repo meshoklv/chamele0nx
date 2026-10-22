@@ -1,0 +1,8 @@
+# Test fixtures use obviously synthetic secrets (e.g. aabbccdd...); they are
+# not real credentials.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "synthetic secrets in Go tests"
+paths = ['''transport/chamele0nx/.*_test\.go''']

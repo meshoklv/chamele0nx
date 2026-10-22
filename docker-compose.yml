@@ -1,0 +1,84 @@
+# Chamele0nX — server on a VPS, client at home.
+#
+#   VPS:   docker compose up -d server
+#   Home:  docker compose --profile client up -d client
+#
+# Copy .env.example to .env first. Full walkthrough: docs/en/DOCKER.md
+
+services:
+  server:
+    build: .
+    image: chamele0nx:local
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - ${CERTS_DIR:-./certs}:/etc/chamele0nx/tls:ro
+      - ${COVER_DIR:-./deploy/cover-site}:/var/www/cover:ro
+      - ${SECRET_FILE:-./secrets/secret}:/run/secrets/chamele0nx-secret:ro
+      # Optional: uncomment and set PROFILE_FILE in .env
+      # - ${PROFILE_FILE}:/etc/chamele0nx/profile.json:ro
+    command:
+      - -addr=:443
+      - -cert=/etc/chamele0nx/tls/fullchain.pem
+      - -key=/etc/chamele0nx/tls/privkey.pem
+      - -cover-dir=/var/www/cover
+      - -secret-file=/run/secrets/chamele0nx-secret
+      - -api-path=${API_PATH:-/api/v1/events}
+      - -server-id=${SERVER_ID:-chamele0nx-1}
+      - -cookie-format=${COOKIE_FORMAT:-wordpress}
+      # - -profile=/etc/chamele0nx/profile.json
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt:
+      - no-new-privileges:true
+
+  # Issues a Let's Encrypt certificate into ./certs (port 80 must be free):
+  #   docker compose --profile tools run --rm certbot
+  certbot:
+    profiles: ["tools"]
+    image: certbot/certbot:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        certbot certonly --standalone -n --agree-tos
+        -m "$${ACME_EMAIL}" -d "$${DOMAIN}" --cert-name chamele0nx
+        && cp -L /etc/letsencrypt/live/chamele0nx/fullchain.pem /out/fullchain.pem
+        && cp -L /etc/letsencrypt/live/chamele0nx/privkey.pem /out/privkey.pem
+        && chown 65532:65532 /out/fullchain.pem /out/privkey.pem && chmod 0600 /out/fullchain.pem /out/privkey.pem
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - ./certs:/out
+
+  # The client opens a SOCKS5 proxy on 127.0.0.1:${SOCKS_PORT}.
+  # The listener is bound to loopback inside the process, so the container
+  # shares the host network namespace (Linux hosts) instead of publishing a port.
+  client:
+    profiles: ["client"]
+    build: .
+    image: chamele0nx:local
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: ["/usr/local/bin/chamele0nx-client"]
+    command:
+      - -server=${SERVER}
+      - -secret-file=/run/secrets/chamele0nx-secret
+      - -api-path=${API_PATH:-/api/v1/events}
+      - -server-id=${SERVER_ID:-chamele0nx-1}
+      - -cookie-format=${COOKIE_FORMAT:-wordpress}
+      - -port=${SOCKS_PORT:-1080}
+    volumes:
+      - ${SECRET_FILE:-./secrets/secret}:/run/secrets/chamele0nx-secret:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  letsencrypt:
