@@ -4,7 +4,7 @@ package chamele0nx
 //
 // This is a registration shim. The actual Open() implementation still
 // lives inline in Transport.connect(): that function is ~400 lines of
-// uTLS + fhttp/http2 + POST pipe + auth wiring, and carving it out
+// uTLS + HTTP/2 client + POST pipe + auth wiring, and carving it out
 // cleanly without regressing 90 tests is a separate change.
 //
 // For now this file exists to:
@@ -66,7 +66,7 @@ func (saasHTTP2Cover) Describe() string {
 // error goes away once the inline body moves here.
 //
 // CONTRACT for the future: this method will take OpenOptions, run
-// the full dialChamele0nXUTLS → ShapedConn → fhttp/http2 → POST pipe
+// the full dialChamele0nXUTLS → ShapedConn → HTTP/2 client → POST pipe
 // sequence, and return a net.Conn that the caller can wrap with mux
 // and crypto. Nothing else in Chamele0nX should need to know what this
 // function does.

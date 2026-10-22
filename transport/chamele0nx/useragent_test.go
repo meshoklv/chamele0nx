@@ -71,7 +71,7 @@ func TestUserAgentPoolShape(t *testing.T) {
 
 // TestUserAgentPoolChromium enforces the
 // invariant that every UA in the pool is Chromium-based, so its real-
-// browser H2 SETTINGS fingerprint matches what fhttp/http2 emits in
+// browser H2 SETTINGS fingerprint matches what the HTTP/2 client emits in
 // chamele0nx.go connect() (Chrome 146 profile).
 //
 // An active prober with a valid auth token would catch a UA/H2 mismatch
@@ -83,11 +83,11 @@ func TestUserAgentPoolShape(t *testing.T) {
 //
 // Requirements every entry must satisfy:
 //  1. Contains the literal substring "Chrome/146" — asserts Chromium
-//     engine matching our fhttp H2 profile.
+//     engine matching our H2 profile.
 //  2. Does NOT contain "Firefox/", "CriOS/", or "Version/26.0" — the
 //     three stop-markers of Firefox / iOS Chrome / Safari, respectively.
 //
-// If the pool ever needs to support non-Chromium UAs, fhttp/http2 would
+// If the pool ever needs to support non-Chromium UAs, the HTTP/2 client would
 // have to be taught per-UA H2 fingerprint profiles AND pickUserAgent
 // would need to expose its choice back to the H2 config path.
 // Both are explicitly out of scope; until then this test stays.

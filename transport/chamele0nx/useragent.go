@@ -12,7 +12,7 @@ package chamele0nx
 //
 // ===== The pool is restricted to Chromium-compatible User-Agents =====
 //
-// The client sends HTTP/2 via fhttp/http2 configured to emit the Chrome 146
+// The client sends HTTP/2 via the HTTP/2 client configured to emit the Chrome 146
 // H2 fingerprint (SETTINGS, window size, pseudo-header order — see
 // chamele0nx.go connect()). A UA advertising Firefox or Safari in the header
 // combined with Chrome's H2 SETTINGS is a *visible mismatch* to any active
@@ -37,7 +37,7 @@ package chamele0nx
 // real Chrome user is on the latest stable release, not one from a year ago.
 
 // userAgentPool is the rotation set. Every entry MUST be a Chromium-based
-// browser so its real-browser H2 fingerprint matches what fhttp/http2 emits
+// browser so its real-browser H2 fingerprint matches what the HTTP/2 client emits
 // (Chrome 146). Selection is by hash modulo length (pickUserAgent), not by
 // index, so order doesn't matter.
 var userAgentPool = []string{
