@@ -1,100 +1,113 @@
-<p align="center"><img src="docs/cover.png" alt="Chamele0nX cover" width="100%"></p>
+<p align="center"><img src="docs/cover.png" alt="Chamele0nX" width="100%"></p>
 
-<div align="center">
+<h1 align="center">Chamele0nX</h1>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/chameleon-logo-dark.svg">
-  <img src="docs/assets/brand/chameleon-logo-light.svg" alt="Chamele0nX" width="120" height="120">
-</picture>
+<p align="center"><b>A VPN transport that looks like someone browsing a website.</b><br>
+To a DPI box it is plain HTTPS to a real site, right down to record sizes and timing.</p>
 
-# Chamele0nX
+<p align="center">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue?style=flat-square"></a>
+  <a href="go.mod"><img alt="Go" src="https://img.shields.io/badge/go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white"></a>
+  <img alt="Platform" src="https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey?style=flat-square">
+  <a href="https://github.com/meshoklv/chamele0nx/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/meshoklv/chamele0nx/ci.yml?branch=main&style=flat-square&label=CI"></a>
+  <img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square">
+</p>
 
-**A VPN transport that does not look like a VPN. It is shaped to look like someone using a website.**
-
-</div>
-
-[Русская версия](README.ru.md) · [Protocol specification](docs/en/SPEC.md) · [Threat model](docs/en/THREAT-MODEL.md) · [Install](docs/en/INSTALL.md) · [Docker](docs/en/DOCKER.md)
-
-[![CI](https://github.com/meshoklv/chamele0nx/actions/workflows/ci.yml/badge.svg)](https://github.com/meshoklv/chamele0nx/actions/workflows/ci.yml)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
-[![Go 1.26](https://img.shields.io/badge/Go-1.26-00ADD8.svg)](go.mod)
+<p align="center">
+  <a href="#-quick-start">Quick start</a> ·
+  <a href="#-features">Features</a> ·
+  <a href="#-how-it-works">How it works</a> ·
+  <a href="#-how-it-compares">Comparison</a> ·
+  <a href="#-configuration">Configuration</a> ·
+  <a href="README.ru.md">Русский</a>
+</p>
 
 ---
 
-## The problem
+<table>
+<tr>
+<td width="33%" valign="top">
 
-Modern national censorship no longer looks inside your TLS connection. It
-does not need to. It looks at the *shape* of the connection: how big the
-TLS records are, how they clump into bursts, how long the pauses are, how
-much you upload versus download, how long the session lasts.
+**🌐 A real website**<br>
+Real domain, real certificate. A visitor, or an active prober, with no valid cookie gets the cover site and nothing else.
 
-A VPN carrying a video stream produces a long, flat river of maximum-size
-records. A person reading a web dashboard produces short violent bursts
-of mixed-size records with idle gaps in between. Those two things look
-nothing alike, and a classifier trained on that difference does not care
-that your payload is encrypted, that your certificate is real, or that
-your SNI says `microsoft.com`.
+</td>
+<td width="33%" valign="top">
 
-This is why protocols that hide *what* you send keep getting blocked
-anyway. Shadowsocks, VLESS+REALITY and WireGuard all encrypt perfectly
-and all still get detected, because none of them was built to control
-what the traffic *looks like* from the outside.
+**📈 Shaped like one**<br>
+TLS record sizes, bursts and pauses are drawn from a profile measured on real site traffic, not a flat river of 16 KB records.
 
-![What the censor actually looks at](docs/assets/en/01-what-the-censor-sees.svg)
+</td>
+<td width="33%" valign="top">
 
-## What Chamele0nX does
+**🦎 Chrome on the wire**<br>
+uTLS ClientHello plus Chrome's exact HTTP/2 SETTINGS, window update and header order.
 
-Chamele0nX carries VPN traffic inside HTTP/2 requests to a real HTTPS
-site, and then reshapes the TLS record stream so its statistics match a
-real site's traffic profile.
+</td>
+</tr>
+</table>
 
-Two things happen at once:
+## 💡 Why
 
-**It is a real website.** The server has a real domain and a real
-certificate. If you point it at a cover site with `-cover-dir`, which is
-empty by default, opening it in a browser gets you an ordinary web
-application. There is no magic port and no special path that answers
-differently. An unauthenticated visitor — including an active prober
-checking whether this host is a proxy — sees the cover site and nothing
-that points at a tunnel. Unknown paths get the cover site's own
-`404.html` if the directory ships one — `deploy/cover-site` does. Leave
-that file out and the fallback is Go's static file server, whose body is
-the literal string `404 page not found`: not what a WordPress or Django
-site would say, and enough on its own to tell a prober that the site is
-not what its cover story claims. See
-[INSTALL.md](docs/en/INSTALL.md) section 10.
+Censors increasingly stop looking *inside* your TLS and look at its **shape**: record sizes, burst
+pattern, idle gaps, up/down ratio, session length. A VPN pushing a video stream is a long flat
+stream of maximum-size records; a person on a web dashboard is short, uneven bursts with pauses.
+A classifier trained on that difference does not care that your payload is encrypted or your SNI
+says `microsoft.com`. Protocols that only hide *what* you send keep getting blocked for this reason.
 
-**It moves like a real website.** Every TLS record the server emits is
-sized and timed from a statistical profile measured on a real site: a
-record-size histogram, how many records make up a burst, and how long the
-pauses between bursts are. Bulk traffic is chopped and paced to fit that
-distribution instead of streaming out flat 16 KB records. The profile
-format also records session volumes and an upload-to-download ratio, but
-the current shaper does not enforce those; see
-[PROFILES.md](docs/en/PROFILES.md).
+Chamele0nX hides the *shape* too. It carries the tunnel inside an HTTP/2 POST to a site you run,
+and reshapes the TLS record stream to match that site's statistics.
 
-The result is a tunnel whose *metadata* matches the cover, not just its
-contents.
+## ✨ Features
 
-![How a request travels](docs/assets/en/02-architecture.svg)
+| | |
+|---|---|
+| 🕵️ **Probe-resistant** | No valid cookie means the cover site answers. No special port, no special path. |
+| 🍪 **Rotating auth** | `HMAC-SHA256(secret, time_bucket ‖ server_id)` in a WordPress, Django or generic session cookie. Rotates every 5 minutes, compared in constant time. |
+| 📊 **Profile-based shaping** | Record-size histogram, burst length and pauses from `chamele0nx-profiler`, applied both directions. |
+| 🔐 **Forward secrecy** | X25519 key exchange, HKDF-SHA256, AES-256-GCM inside the HTTP/2 stream. |
+| 🔀 **Multiplexed** | TCP and UDP streams over a single POST. Local SOCKS5 proxy on the client. |
+| 🧪 **Self-testing** | `chamele0nx-validator` runs statistical tests: does our output match the profile? 180 Go tests. |
+| 📦 **One small binary each** | Server, client, profiler, validator. Go 1.26, pure Go (CGO off). |
 
-## What an observer sees
+## 🚀 Quick start
 
-| The observer checks | A typical VPN | Chamele0nX |
-|---|---|---|
-| Open the address in a browser | Nothing, or an error | An ordinary website |
-| Probe the server with a wrong secret | A different error, or silence | The same website |
-| Certificate and SNI | Often a borrowed or self-signed one | A real certificate for your own domain |
-| Record sizes and bursts | A long flat river of max-size records | Sized and paced from a profile of a real site |
-| HTTP/2 and TLS fingerprint | Library defaults | Chrome-like (uTLS) |
+You need a server with a domain and a TLS certificate, and Go 1.26 to build.
 
-It does not make you invisible; read the [threat model](docs/en/THREAT-MODEL.md)
-for what it does not cover.
+```bash
+git clone https://github.com/meshoklv/chamele0nx && cd chamele0nx
+make build            # -> ./bin/chamele0nx-{server,client,profiler,validator}
+```
 
-## Run it at home in one command
+**Server** (put a real static site in `-cover-dir`):
 
-Server on a VPS, client at home, both with Docker Compose
-(details and caveats in [docs/en/DOCKER.md](docs/en/DOCKER.md)):
+```bash
+./bin/chamele0nx-server -addr :443 \
+  -cert /etc/letsencrypt/live/vpn.example.com/fullchain.pem \
+  -key  /etc/letsencrypt/live/vpn.example.com/privkey.pem \
+  -cover-dir /var/www/cover -cookie-format wordpress
+# with no -secret it generates one and prints it; that value is the only credential
+```
+
+**Client** (opens a local SOCKS5 proxy):
+
+```bash
+./bin/chamele0nx-client -server vpn.example.com:443 \
+  -secret-file ~/.config/chamele0nx/secret -cookie-format wordpress -port 1080
+
+curl -x socks5h://127.0.0.1:1080 https://example.org/
+```
+
+Check the whole path without configuring anything else: add `-check` to the client command.
+
+> [!WARNING]
+> The defaults you did not change are what give you away: `-api-path`, `-server-id`,
+> `-cookie-format` and the sample cover site are identical on every untouched deployment.
+> Change them together, on both sides ([INSTALL.md](docs/en/INSTALL.md), section 6), and capture
+> your own traffic profile ([PROFILES.md](docs/en/PROFILES.md)).
+
+<details>
+<summary><b>🐳 Docker Compose (server on a VPS, client at home)</b></summary>
 
 ```bash
 cp .env.example .env && $EDITOR .env           # domain, shared settings
@@ -103,165 +116,170 @@ docker compose --profile tools run --rm certbot && docker compose up -d server  
 docker compose --profile client up -d client                                       # at home -> SOCKS5 127.0.0.1:1080
 ```
 
-## Status
+> [!NOTE]
+> **Tested:** Go build and the full test suite on Linux. **Not yet tested by the author:** the
+> Dockerfile and `docker-compose.yml` end to end, macOS builds, the mobile bindings. Expect small
+> fixes; PRs welcome. Details: [DOCKER.md](docs/en/DOCKER.md).
 
-Working and in use, on a small scale. It is not a finished product.
+</details>
+
+## 🔬 How it works
+
+What the network sees and what is actually going on, on the same connection:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant D as Censor DPI
+    participant S as Server with cover site
+
+    Note over D: Sees an ordinary TLS 1.3 session to vpn.example.com, a Chrome-like ClientHello
+    C->>S: TLS handshake via uTLS
+    Note over C,S: Really the same, nothing to fingerprint
+    C->>S: POST /api/v1/events with a session cookie, HTTP/2 with Chrome SETTINGS
+    Note over D: Sees one more API call to a website
+    Note over C,S: Really the cookie is HMAC-SHA256, it rotates every 5 minutes
+    C->>S: X25519 public key in the request body
+    S-->>C: X25519 public key in the response body
+    Note over C,S: Really an AES-256-GCM tunnel now lives inside one HTTP/2 stream
+    loop Tunnel traffic
+        C->>S: SOCKS5 data, muxed, encrypted, shaped
+        S-->>C: Reply data, shaped to the site profile
+    end
+    Note over D: Sees records and bursts that match a real site, not a flat VPN stream
+    D-->>S: Active probe GET / without a cookie
+    S-->>D: The ordinary cover website
+```
+
+```mermaid
+flowchart LR
+    A["App"] -->|SOCKS5| B["Mux<br/>TCP + UDP streams"]
+    B --> E["AES-256-GCM<br/>X25519 + HKDF"]
+    E --> H["HTTP/2 POST<br/>Chrome SETTINGS"]
+    H --> SH["ShapedConn<br/>record sizes + timing"]
+    SH --> T["uTLS<br/>Chrome ClientHello"]
+    T --> N(("Network"))
+```
+
+Everything above the shaper is ordinary and testable in isolation. The shaper sits *between* TLS and
+the HTTP/2 framer: that one seam is the whole mechanism. Deeper reading:
+[ARCHITECTURE.md](docs/en/ARCHITECTURE.md) · [SPEC.md](docs/en/SPEC.md) · [THREAT-MODEL.md](docs/en/THREAT-MODEL.md).
+
+| The observer checks | A typical VPN | Chamele0nX |
+|---|---|---|
+| Open the address in a browser | Nothing, or an error | An ordinary website |
+| Probe with a wrong secret | A different error, or silence | The same website |
+| Certificate and SNI | Often borrowed or self-signed | A real certificate for your own domain |
+| Record sizes and bursts | Flat river of max-size records | Sized and paced from a real site's profile |
+| HTTP/2 and TLS fingerprint | Library defaults | Chrome-like (uTLS plus Chrome H2 settings) |
+
+## 🆚 How it compares
+
+Facts and sources are in [COMPARISON.md](docs/en/COMPARISON.md); this is the short version, and it is
+not a ranking. Several of these are older, bigger and better hardened than this project.
+
+| Tool | Hides by | Reported weak spot (with sources in the doc) |
+|---|---|---|
+| **Shadowsocks 2022** | Fully encrypted stream, no handshake | The "no protocol structure" itself is detected by entropy heuristics (Wu et al., USENIX Security 2023) |
+| **VLESS + REALITY** | Handshake borrowed from a real popular site | The data stream after the handshake is not shaped; users report volume-based blocking |
+| **Trojan** | Real TLS, falls back to a real website | Blocked at scale in China from October 2022 (address-level) |
+| **NaiveProxy** | Runs Chromium's own network stack | Nothing widely reported; needs a real domain and a Chromium dependency |
+| **Hysteria 2** | QUIC, looks like HTTP/3 | SNI-based QUIC blocking; networks that drop UDP |
+| **Chamele0nX** | Real site **plus** record-size and timing profile | One server address; one profile per server; no independent audit |
+
+> [!NOTE]
+> NaiveProxy solves the browser-fingerprint half more thoroughly than we do, by running the real
+> thing instead of imitating it. If NaiveProxy or REALITY already work on your network, keep using
+> them. Chamele0nX is for when what fails is not the handshake.
+
+## 🔧 Configuration
+
+<details open>
+<summary><b>Server flags</b></summary>
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-addr` | `:443` | Listen address |
+| `-cert`, `-key` | | TLS certificate and key (PEM) |
+| `-cover-dir` | | Static site served to everyone without a valid cookie |
+| `-cookie-format` | `generic` | `generic`, `wordpress` or `django`; must match the client |
+| `-api-path` | `/api/v1/events` | Tunnel endpoint; change it, match the client |
+| `-server-id` | `chamele0nx-1` | Mixed into the auth token; change it, match the client |
+| `-secret-file` | | Hex secret from a file (preferred over `-secret`, which shows up in `ps`) |
+| `-profile` | built-in | Traffic profile JSON from `chamele0nx-profiler` |
+| `-idle-timeout` | `5m` | Close relayed streams with no activity |
+| `-log-format`, `-log-level` | `json`, `info` | Logging |
+
+</details>
+
+<details>
+<summary><b>Client flags</b></summary>
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-server` | | `host:port` of the server |
+| `-secret-file` | | Hex secret from a file |
+| `-port` | `0` (random) | Local SOCKS5 port, bound to 127.0.0.1 |
+| `-cookie-format`, `-api-path`, `-server-id` | as server | Must equal the server's |
+| `-sni` | host of `-server` | TLS SNI |
+| `-profile` | built-in | Traffic profile JSON |
+| `-check` | | Connect, print the external IP through the tunnel, exit |
+
+</details>
+
+Full setup (systemd, sysctl, firewall): [INSTALL.md](docs/en/INSTALL.md). Docker variables:
+[.env.example](.env.example).
+
+## 🧭 Status and limits
+
+Working and in use on a small scale. It is research software, not a finished product.
 
 | | |
 |---|---|
-| **Protocol core** | Stable. TCP and UDP both tunnel. 122 test functions, all passing. |
-| **Server** | Runs on a single host. Sustained operation at scale has not been evaluated. |
-| **CLI client** | Linux and macOS, opens a local SOCKS5 proxy. |
-| **Mobile** | Go bindings exist and are used by an out-of-tree iOS client. No mobile app ships from this repository. |
-| **Measured throughput** | Around 20 Mbit/s on a long-haul intercontinental route. The ceiling was the route, not the protocol. One measurement, by the author, never reproduced. |
-| **Independent review** | None yet. Nobody outside the project has audited this. |
+| **Protocol core** | Stable. TCP and UDP both tunnel. 180 tests pass. |
+| **Server** | Single host. Sustained operation at scale not evaluated. |
+| **Clients** | CLI for Linux and macOS. Go bindings for iOS exist; no mobile app ships here. |
+| **Throughput** | About 20 Mbit/s on a long intercontinental route, one measurement by the author. |
+| **Independent review** | None yet. |
 
-Read [THREAT-MODEL.md](docs/en/THREAT-MODEL.md) before you rely on it for
-anything that matters. It is explicit about what this does not protect
-against.
+> [!WARNING]
+> It does not make you invisible. The server's IP address can still be identified and blocked, and
+> the server's own TLS fingerprint is Go's, not nginx's. Read [THREAT-MODEL.md](docs/en/THREAT-MODEL.md)
+> and [DISCLAIMER.md](DISCLAIMER.md) before relying on it, and check the law where you live.
 
-## Quick start
+Known gaps, worst first, are in [ROADMAP.md](docs/en/ROADMAP.md): version negotiation, per-user
+profile variation, stream flow control, server TLS fingerprint, server discovery.
 
-You need a server with a domain name and a TLS certificate, and Go 1.26
-to build. Full walkthrough in [INSTALL.md](docs/en/INSTALL.md).
-
-```bash
-git clone https://github.com/meshoklv/chamele0nx
-cd chamele0nx
-make build
-```
-
-**Server** — put a real static site in `-cover-dir`, then:
-
-```bash
-./bin/chamele0nx-server \
-  -addr :443 \
-  -cert /etc/letsencrypt/live/vpn.example.com/fullchain.pem \
-  -key  /etc/letsencrypt/live/vpn.example.com/privkey.pem \
-  -cover-dir /var/www/cover \
-  -cookie-format wordpress
-```
-
-With no `-secret` it generates one and prints it. Save it; that value is
-the only credential.
-
-The defaults you did not set are the ones that give you away. `-api-path`,
-`-server-id`, `-cookie-format` and the sample cover site are identical on
-every unchanged deployment, so a scanner that learns one learns them all.
-Change them together, to fit your cover story, and give the client the
-same values — see [INSTALL.md](docs/en/INSTALL.md) section 6.
-
-With no `-profile` the server uses its built-in shape. Before you put
-real traffic through it, capture a profile from the site you are
-pretending to be, with `chamele0nx-profiler`, and keep that file to
-yourself. The examples in `deploy/profiles` exist so the flag can be
-tried; a profile everyone runs is a profile everyone can be recognised
-by. See [PROFILES.md](docs/en/PROFILES.md).
-
-**Client** — opens a SOCKS5 proxy on localhost. Put the secret in a file
-rather than on the command line: an argument is visible to every user on
-the machine through `ps`, and it lands in your shell history.
-
-```bash
-./bin/chamele0nx-client \
-  -server vpn.example.com:443 \
-  -secret-file ~/.config/chamele0nx/secret \
-  -cookie-format wordpress \
-  -port 1080
-
-curl -x socks5h://127.0.0.1:1080 https://example.org/
-```
-
-Check the tunnel end to end without configuring anything:
-
-```bash
-./bin/chamele0nx-client -server vpn.example.com:443 \
-  -secret-file ~/.config/chamele0nx/secret -check
-```
-
-## How authentication works
-
-There is no login. A visitor either presents a valid session cookie or
-gets the website.
-
-The cookie carries `HMAC-SHA256(secret, time_bucket || server_id)`, in
-whatever cookie format the cover site's framework would use — a
-WordPress login cookie, a Django `sessionid`, or a generic `sid`. It
-rotates every five minutes, and the server accepts the current and the
-previous window, so a captured cookie is replayable for at most about ten
-minutes. It is compared in constant time, so a wrong secret takes exactly
-as long to reject as a right one takes to accept.
-
-Everything else — the API path, the request shape, the headers, the User
-Agent — is what the cover site would produce anyway.
-
-![Connecting, step by step](docs/assets/en/03-handshake.svg)
-
-## What is in this repository
-
-```
-transport/chamele0nx/   the protocol: handshake, mux, shaping, cover, UDP
-internal/chcrypto/     AES-256-GCM helpers and key zeroing
-mobile/                gomobile bindings for iOS clients
-cmd/chamele0nx-server/  the server
-cmd/chamele0nx-client/  CLI client with a local SOCKS5 proxy
-cmd/chamele0nx-profiler/  captures a traffic profile from a real site
-cmd/chamele0nx-validator/ statistical tests: does our output match a profile
-deploy/                systemd unit, TCP tuning, example profiles, cover site
-docs/en/, docs/ru/     documentation in English and Russian
-```
-
-## Documentation
+## 📚 Documentation
 
 | | English | Русский |
 |---|---|---|
-| How it works, in depth | [ARCHITECTURE.md](docs/en/ARCHITECTURE.md) | [ARCHITECTURE.md](docs/ru/ARCHITECTURE.md) |
-| Wire protocol specification | [SPEC.md](docs/en/SPEC.md) | [SPEC.md](docs/ru/SPEC.md) |
-| What it protects against, and what it does not | [THREAT-MODEL.md](docs/en/THREAT-MODEL.md) | [THREAT-MODEL.md](docs/ru/THREAT-MODEL.md) |
-| Installing a server | [INSTALL.md](docs/en/INSTALL.md) | [INSTALL.md](docs/ru/INSTALL.md) |
-| Docker: server + home client | [DOCKER.md](docs/en/DOCKER.md) | [DOCKER.md](docs/ru/DOCKER.md) |
-| Running one safely | [OPERATIONS.md](docs/en/OPERATIONS.md) | [OPERATIONS.md](docs/ru/OPERATIONS.md) |
+| Architecture | [ARCHITECTURE.md](docs/en/ARCHITECTURE.md) | [ARCHITECTURE.md](docs/ru/ARCHITECTURE.md) |
+| Wire protocol | [SPEC.md](docs/en/SPEC.md) | [SPEC.md](docs/ru/SPEC.md) |
+| Threat model | [THREAT-MODEL.md](docs/en/THREAT-MODEL.md) | [THREAT-MODEL.md](docs/ru/THREAT-MODEL.md) |
+| Install a server | [INSTALL.md](docs/en/INSTALL.md) | [INSTALL.md](docs/ru/INSTALL.md) |
+| Docker | [DOCKER.md](docs/en/DOCKER.md) | [DOCKER.md](docs/ru/DOCKER.md) |
+| Operations | [OPERATIONS.md](docs/en/OPERATIONS.md) | [OPERATIONS.md](docs/ru/OPERATIONS.md) |
 | Traffic profiles | [PROFILES.md](docs/en/PROFILES.md) | [PROFILES.md](docs/ru/PROFILES.md) |
-| Clients, including mobile | [CLIENTS.md](docs/en/CLIENTS.md) | [CLIENTS.md](docs/ru/CLIENTS.md) |
-| How it compares to other tools | [COMPARISON.md](docs/en/COMPARISON.md) | [COMPARISON.md](docs/ru/COMPARISON.md) |
-| Frequent questions | [FAQ.md](docs/en/FAQ.md) | [FAQ.md](docs/ru/FAQ.md) |
-| Where this is going | [ROADMAP.md](docs/en/ROADMAP.md) | [ROADMAP.md](docs/ru/ROADMAP.md) |
-| Research this design draws on | [RESEARCH.md](docs/en/RESEARCH.md) | [RESEARCH.md](docs/ru/RESEARCH.md) |
+| Clients | [CLIENTS.md](docs/en/CLIENTS.md) | [CLIENTS.md](docs/ru/CLIENTS.md) |
+| Comparison | [COMPARISON.md](docs/en/COMPARISON.md) | [COMPARISON.md](docs/ru/COMPARISON.md) |
+| FAQ | [FAQ.md](docs/en/FAQ.md) | [FAQ.md](docs/ru/FAQ.md) |
+| Research | [RESEARCH.md](docs/en/RESEARCH.md) | [RESEARCH.md](docs/ru/RESEARCH.md) |
 
-## Contributing
+## 🤝 Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md). The short version: small pull
-requests, no change that makes the traffic more regular, nothing
-identifying in logs, and **security problems go through a private
-advisory, never a public issue** — see [SECURITY.md](SECURITY.md).
+Small pull requests, no change that makes traffic more regular, nothing identifying in logs.
+See [CONTRIBUTING.md](CONTRIBUTING.md). **Security problems go through a private advisory, never a
+public issue**: [SECURITY.md](SECURITY.md).
 
-## Legal notice
+## 📄 License
 
-Rules covering network transports of this kind differ substantially
-between countries and change over time. In some places running or using
-software like this is unremarkable; in others it carries consequences for
-the person doing it. Working out which applies to you is your
-responsibility, and this project cannot advise you on it.
+[AGPL-3.0-or-later](LICENSE). Run it, modify it, offer it as a service; if you offer a modified
+version as a service, publish the modifications. Dependencies: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Built on [uTLS](https://github.com/refraction-networking/utls) and the published work of the
+anti-censorship community ([RESEARCH.md](docs/en/RESEARCH.md)).
 
-This is research software, published so its design can be examined. It is
-not offered as a service, and nobody operates infrastructure for anyone
-here. Read [DISCLAIMER.md](DISCLAIMER.md) before you rely on any of it.
+---
 
-## Licence
-
-Copyright (C) 2026 Chamele0nX contributors.
-
-AGPL-3.0-or-later. See [LICENSE](LICENSE). Third-party dependencies: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-You may run this, modify it, and offer it as a service. If you offer a
-modified version as a service, the AGPL requires you to publish those
-modifications. That is the point: in this field, unauditable forks are
-the problem, not the solution.
-
-## Acknowledgements
-
-This work stands on [uTLS](https://github.com/refraction-networking/utls)
-for browser-accurate TLS fingerprints, and on the published research and
-practice of the anti-censorship community — Tor's pluggable transports,
-obfs4, meek, Snowflake, NaiveProxy, Xray/REALITY and Hysteria. See
-[RESEARCH.md](docs/en/RESEARCH.md) for the papers this design draws on.
+<p align="center">Made by <a href="https://github.com/meshoklv">@meshoklv</a></p>

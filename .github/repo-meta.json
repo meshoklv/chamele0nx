@@ -1,0 +1,5 @@
+{
+  "description": "VPN transport that looks like browsing a real website: HTTP/2 to a cover site, Chrome fingerprints, TLS record shaping.",
+  "homepage": "",
+  "topics": ["vpn", "censorship-circumvention", "anti-censorship", "dpi-evasion", "obfuscation", "traffic-shaping", "utls", "http2", "socks5", "golang"]
+}
