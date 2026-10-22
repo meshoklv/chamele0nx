@@ -28,6 +28,15 @@ linters:
 
   exclusions:
     rules:
+      # x/net/http2.Server.ServeConn is deprecated in favour of net/http, but
+      # net/http has no per-connection entry point: the server needs to hand
+      # each already-handshaked, per-client-shaped connection (plus a
+      # per-connection context carrying its ShapedConn) straight to HTTP/2.
+      # Revisit when net/http grows such an API; only this deprecation is
+      # silenced, and only for the http2 package.
+      - linters:
+          - staticcheck
+        text: 'SA1019: .*golang\.org/x/net/http2'
       # Table-driven tests are allowed to be long and repetitive.
       - path: _test\.go
         linters:
