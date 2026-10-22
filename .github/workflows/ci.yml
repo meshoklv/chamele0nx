@@ -119,6 +119,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
+          # Stdlib advisories are fixed in patch releases; scan with the newest one.
+          check-latest: true
           cache: true
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck ./...

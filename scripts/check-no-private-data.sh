@@ -106,7 +106,7 @@ hits=$(grep -nHoE '\b([0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{1,4}\b' "${files[@]}" 2
 [ -n "$hits" ] && report "Possible real IPv6 addresses:" "$hits"
 
 # 6. Captured traffic profiles. Only the generic examples may be committed.
-hits=$(git ls-files '*.json' | grep -vE '^deploy/profiles/.*\.example\.json$' || true)
+hits=$(git ls-files '*.json' | grep -vE '^(deploy/profiles/.*\.example\.json|\.github/repo-meta\.json)$' || true)
 [ -n "$hits" ] && report "JSON files outside deploy/profiles/*.example.json — a captured profile?" "$hits"
 
 # 7. The same credential shapes anywhere in the commit history. A secret that was

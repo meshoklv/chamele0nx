@@ -95,7 +95,11 @@ func TestChromeH2Fingerprint(t *testing.T) {
 	req.Header.Set("User-Agent", "x")
 	req.Header[reqlib.HeaderOderKey] = []string{"cookie", "content-type", "accept", "user-agent"}
 	req.Header[reqlib.PseudoHeaderOderKey] = chromePseudoHeaderOrder
-	go func() { _, _ = h2t.RoundTrip(req) }()
+	go func() {
+		if resp, err := h2t.RoundTrip(req); err == nil {
+			_ = resp.Body.Close()
+		}
+	}()
 
 	r := <-done
 	if r.err != nil {

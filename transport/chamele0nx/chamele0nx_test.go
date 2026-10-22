@@ -809,7 +809,7 @@ func connectChamele0nXTest(ctx context.Context, ct *Transport, endpoint transpor
 
 	pr, pw := io.Pipe()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://%s%s", sni, apiPath), pr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("https://%s%s", sni, apiPath), pr)
 	if err != nil {
 		pw.Close()
 		return nil, err
